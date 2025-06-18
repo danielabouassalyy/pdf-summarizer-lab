@@ -1,0 +1,18 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "<your-storage-connection-string>",
+    "BLOB_STORAGE_ENDPOINT": "<your-storage-connection-string>",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    
+    "InputContainerName": "input",
+    "OutputContainerName": "output",
+    
+    "COGNITIVE_SERVICES_ENDPOINT": "https://<your-ocr-resource>.cognitiveservices.azure.com/",
+    "COGNITIVE_SERVICES_KEY": "<your-ocr-key>",
+    
+    "AZURE_OPENAI_ENDPOINT": "https://<your-openai-resource>.openai.azure.com/",
+    "AZURE_OPENAI_KEY": "<your-openai-key>",
+    "AZURE_OPENAI_DEPLOYMENT_NAME": "gpt35turbo"
+  }
+}
