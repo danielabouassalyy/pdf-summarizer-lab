@@ -12,6 +12,7 @@ This project ingests PDFs from an Azure Blob Storage “input” container, extr
 4. **Write Summary** – drops a `.txt` summary into `output/`
 
 ##  Repo Structure
+```text
 .
 ├── function_app.py # Durable Functions orchestration & activities
 ├── host.json # Functions host configuration
@@ -19,7 +20,7 @@ This project ingests PDFs from an Azure Blob Storage “input” container, extr
 ├── local.settings.json # excluded – my local secrets
 ├── .gitignore # ignores venv, local.settings.json, azurite data
 └── README.md
-
+```
 
 
 ## Prerequisites
@@ -131,22 +132,22 @@ Create a file named local.settings.json in the repo root:
 }
 ```
 ### 3. Run 
-activate virtual env
+- Activate virtual env
 ```bash
 venv\Scripts\activate
 ```
 
-Fire up your Functions host in verbose mode so you can see each step:
+- Fire up your Functions host in verbose mode so you can see each step:
 ```bash
 func start --verbose
 ```
-Test it
+- Test it
 
-Upload a PDF into your input container (via Portal, Storage Explorer, or Az CLI).
+   Upload a PDF into your input container (via Portal, Storage Explorer, or Az CLI).
 
-Watch the console logs spin through analyze_pdf, summarize_text, write_summary.
+   Watch the console logs spin through analyze_pdf, summarize_text, write_summary.
 
-Inspect the new .txt in your output container—it should contain your GPT summary!
+   Inspect the new .txt in your output container—it should contain your GPT summary!
 
 ## `function_app.py` Breakdown
 ### Imports & Setup
