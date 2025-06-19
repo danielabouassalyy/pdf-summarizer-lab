@@ -115,7 +115,7 @@ venv\Scripts\activate      # Windows
 pip install -r requirements.txt
 ```
 ### 2. Configure Local Settings
-Create a file named local.settings.json in the repo root:
+- Create a file named local.settings.json in the repo root:
 ```json
 {
   "IsEncrypted": false,
@@ -123,6 +123,8 @@ Create a file named local.settings.json in the repo root:
     "AzureWebJobsStorage":    "<your-connection-string>",
     "FUNCTIONS_WORKER_RUNTIME": "python",
     "BLOB_STORAGE_ENDPOINT":  "<same-connection-string>",
+    "InputContainerName": "input",
+    "OutputContainerName": "output",
     "COGNITIVE_SERVICES_ENDPOINT": "https://<your-ocr>.cognitiveservices.azure.com/",
     "COGNITIVE_SERVICES_KEY":      "<your-ocr-key>",
     "AZURE_OPENAI_ENDPOINT":       "https://<your-openai>.openai.azure.com/",
