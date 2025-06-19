@@ -48,7 +48,7 @@ This project ingests PDFs from an Azure Blob Storage “input” container, extr
 
 3. **Grab Connection String**  
    - Go to **Access keys** under **Security + networking**.  
-   - Copy one of the **Connection strings**—you’ll use this for both `AzureWebJobsStorage` and `BLOB_STORAGE_ENDPOINT`.
+   - Copy one of the **Connection strings**—> you’ll use this for both `AzureWebJobsStorage` and `BLOB_STORAGE_ENDPOINT`.
 
 ---
 
