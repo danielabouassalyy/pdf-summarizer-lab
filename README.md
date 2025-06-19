@@ -2,7 +2,7 @@
 
 **An intelligent PDF summarizer using Azure Durable Functions, Form Recognizer & OpenAI.**
 
-## 🎯 Overview
+## Overview
 
 This project ingests PDFs from an Azure Blob Storage “input” container, extracts text via Form Recognizer, generates a summary via Azure OpenAI (GPT-3.5), and writes the result to an “output” container. It’s implemented as a Durable Functions orchestration:
 
@@ -11,9 +11,7 @@ This project ingests PDFs from an Azure Blob Storage “input” container, extr
 3. **Summarize Text** – calls Azure OpenAI to generate a summary
 4. **Write Summary** – drops a `.txt` summary into `output/`
 
-![architecture](./docs/architecture.png) _(optional diagram)_
-
-## 📦 Repo Structure
+##  Repo Structure
 .
 ├── function_app.py # Durable Functions orchestration & activities
 ├── host.json # Functions host configuration
