@@ -1,4 +1,5 @@
-# Azure PDF Summarizer Lab
+# Azure PDF Summarizer Lab - Daniel Abou-Assaly/ [![Watch the PDF Summarizer Demo on YouTube](https://img.youtube.com/vi/Ix146AXr2v0/0.jpg)](https://youtu.be/Ix146AXr2v0)
+
 
 **An intelligent PDF summarizer using Azure Durable Functions, Form Recognizer & OpenAI.**
 
