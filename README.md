@@ -1,107 +1,386 @@
-<!--
+# Azure PDF Summarizer Lab
+
+**An intelligent PDF summarizer using Azure Durable Functions, Form Recognizer & OpenAI.**
+
+## 🎯 Overview
+
+This project ingests PDFs from an Azure Blob Storage “input” container, extracts text via Form Recognizer, generates a summary via Azure OpenAI (GPT-3.5), and writes the result to an “output” container. It’s implemented as a Durable Functions orchestration:
+
+1. **Blob Trigger** – kicks off when a PDF lands in `input/`
+2. **Analyze PDF** – reads and OCRs the PDF (Form Recognizer)
+3. **Summarize Text** – calls Azure OpenAI to generate a summary
+4. **Write Summary** – drops a `.txt` summary into `output/`
+
+![architecture](./docs/architecture.png) _(optional diagram)_
+
+## 📦 Repo Structure
+.
+├── function_app.py # Durable Functions orchestration & activities
+├── host.json # Functions host configuration
+├── requirements.txt # Python dependencies
+├── local.settings.json # excluded – my local secrets
+├── .gitignore # ignores venv, local.settings.json, azurite data
+└── README.md
+
+
+
+## Prerequisites
+
+- Python 3.9+  
+- Azure Functions Core Tools v4  
+- Azure Storage Emulator or Azurite (for local dev)
+- An Azure Blob Storage account  
+- An Azure Form Recognizer resource  
+- An Azure OpenAI resource with a deployed “gpt35turbo” model  
+
+## Azure Resource Setup
+
+### 1. Storage Account
+
+1. **Create Storage Account**  
+   - In the Azure Portal, click **Create a resource** → **Storage** → **Storage account**.  
+   - Fill in **Subscription**, **Resource group**, **Name** (e.g. `pdflabstore`), **Region**, **Performance** (Standard), **Replication** (LRS).  
+   - Click **Review + create**, then **Create**.
+
+2. **Create Blob Containers**  
+   - Navigate to your new Storage Account → **Blob service** → **Containers**.  
+   - Click **+ Container**, name it **input**, and set **Public access level** to **Private**.  
+   - Repeat to create **output** (also Private).
+
+3. **Grab Connection String**  
+   - Go to **Access keys** under **Security + networking**.  
+   - Copy one of the **Connection strings**—you’ll use this for both `AzureWebJobsStorage` and `BLOB_STORAGE_ENDPOINT`.
+
 ---
-description: This end-to-end sample shows how implement an intelligent PDF summarizer using Durable Functions. 
-page_type: sample
-products:
-- azure-functions
-- azure
-urlFragment: durable-func-pdf-summarizer
-languages:
-- python
-- bicep
-- azdeveloper
+
+### 2. Form Recognizer (Cognitive Services)
+
+1. **Create Form Recognizer**  
+   - In the Portal, click **Create a resource** → **AI + Machine Learning** → **Form Recognizer**.  
+   - Choose your **Resource group**, give it a **Name** (e.g. `pdflab-ocr`), select **Region**, and pick a **Pricing tier**.  
+   - Click **Review + create**, then **Create**.
+
+2. **Get Endpoint & Key**  
+   - Once deployed, open your Form Recognizer resource.  
+   - Under **Keys and Endpoint**, copy:  
+     - **Endpoint** (e.g. `https://pdflab-ocr.cognitiveservices.azure.com/`)  
+     - **Key** (one of the two keys)
+
 ---
--->
 
-# Intelligent PDF Summarizer
-The purpose of this sample application is to demonstrate how Durable Functions can be leveraged to create intelligent applications, particularly in a document processing scenario. Order and durability are key here because the results from one activity are passed to the next. Also, calls to services like Cognitive Service or Azure Open AI can be costly and should not be repeated in the event of failures.
+### 3. Azure OpenAI
 
-This sample integrates various Azure services, including Azure Durable Functions, Azure Storage, Azure Cognitive Services, and Azure Open AI.
+1. **Create Azure OpenAI Resource**  
+   - Click **Create a resource** → **AI + Machine Learning** → **Azure OpenAI**.  
+   - Fill in **Resource group**, **Name** (e.g. `pdflab-openai`), **Region**, **Pricing tier** (Standard S0).  
+   - Click **Review + create**, then **Create**.
 
-The application showcases how PDFs can be ingested and intelligently scanned to determine their content.
+2. **Deploy the Model**  
+   - After creation, open **Azure OpenAI Studio** from the resource blade.  
+   - Go to **Deployments** → **+ New deployment**.  
+     - **Model**: `gpt-35-turbo`  
+     - **Deployment name**: `gpt35turbo` (avoid extra hyphens)  
+   - Click **Deploy** and wait for provisioning to finish.
 
-![Architecture Diagram](./media/architecture_v2.png)
+3. **Get Endpoint & Key**  
+   - Back in the Azure Portal, on your Azure OpenAI resource:  
+     - **Endpoint** (e.g. `https://pdflab-openai.openai.azure.com/`)  
+     - Under **Keys and Endpoint**, copy **Key 1**
 
-The application's workflow is as follows:
-1.	PDFs are uploaded to a blob storage input container.
-2.	A durable function is triggered upon blob upload.
-- - Downloads the blob (PDF).
-- - Utilizes the Azure Cognitive Service Form Recognizer endpoint to extract the text from the PDF.
-- - Sends the extracted text to Azure Open AI to analyze and determine the content of the PDF.
-- - Save the summary results from Azure Open AI to a new file and upload it to the output blob container.
+---
 
-Below, you will find the instructions to set up and run this app locally..
+### 4. Configuration Reference
 
-## Prerequsites
-- [Create an active Azure subscription](https://learn.microsoft.com/en-us/azure/guides/developer/azure-developer-guide#understanding-accounts-subscriptions-and-billing).
-- [Install the latest Azure Functions Core Tools to use the CLI](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local)
-- Python 3.9 or greater
-- Access permissions to [create Azure OpenAI resources and to deploy models](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/role-based-access-control).
-- [Start and configure an Azurite storage emulator for local storage](https://learn.microsoft.com/azure/storage/common/storage-use-azurite).
+Once you have all of the above, your **local.settings.json** (and Azure Function App settings env) should look like:
 
-## local.settings.json
-You will need to configure a `local.settings.json` file at the root of the repo that looks similar to the below. Make sure to replace the placeholders with your specific values.
+| Setting                         | Value                                        |
+|---------------------------------|----------------------------------------------|
+| `AzureWebJobsStorage`           | `<your-storage-connection-string>`           |
+| `BLOB_STORAGE_ENDPOINT`         | `<your-storage-connection-string>`           |
+| `COGNITIVE_SERVICES_ENDPOINT`   | `https://pdflab-ocr.cognitiveservices.azure.com/` |
+| `COGNITIVE_SERVICES_KEY`        | `<your-form-recognizer-key>`                 |
+| `AZURE_OPENAI_ENDPOINT`         | `https://pdflab-openai.openai.azure.com/`    |
+| `AZURE_OPENAI_KEY`              | `<your-azure-openai-key>`                    |
+| `AZURE_OPENAI_DEPLOYMENT_NAME`  | `gpt35turbo`                                 |
 
+now the Function App can read PDFs from **input/**, OCR them, summarize via GPT-3.5, and write the result to **output/**!
+
+
+### 1. Clone & Install
+
+```bash
+git clone https://github.com/your-org/pdf-summarizer-lab.git
+cd pdf-summarizer-lab
+python -m venv venv
+venv\Scripts\activate      # Windows
+pip install -r requirements.txt
+```
+### 2. Configure Local Settings
+Create a file named local.settings.json in the repo root:
 ```json
 {
+  "IsEncrypted": false,
   "Values": {
-    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "AzureWebJobsFeatureFlags": "EnableWorkerIndexing",
+    "AzureWebJobsStorage":    "<your-connection-string>",
     "FUNCTIONS_WORKER_RUNTIME": "python",
-    "BLOB_STORAGE_ENDPOINT": "<BLOB-STORAGE-ENDPOINT>",
-    "COGNITIVE_SERVICES_ENDPOINT": "<COGNITIVE-SERVICE-ENDPOINT>",
-    "AZURE_OPENAI_ENDPOINT": "AZURE-OPEN-AI-ENDPOINT>",
-    "AZURE_OPENAI_KEY": "<AZURE-OPEN-AI-KEY>",
-    "CHAT_MODEL_DEPLOYMENT_NAME": "<AZURE-OPEN-AI-MODEL>"
+    "BLOB_STORAGE_ENDPOINT":  "<same-connection-string>",
+    "COGNITIVE_SERVICES_ENDPOINT": "https://<your-ocr>.cognitiveservices.azure.com/",
+    "COGNITIVE_SERVICES_KEY":      "<your-ocr-key>",
+    "AZURE_OPENAI_ENDPOINT":       "https://<your-openai>.openai.azure.com/",
+    "AZURE_OPENAI_KEY":            "<your-openai-key>",
+    "AZURE_OPENAI_DEPLOYMENT_NAME":"gpt35turbo"
   }
 }
 ```
-
-## Running the app locally
-1. Start Azurite: Begin by starting Azurite, the local Azure Storage emulator.
-
-2. Install the Requirements: Open your terminal and run the following command to install the necessary packages:
-
+### 3. Run 
+activate virtual env
 ```bash
-python3 -m pip install -r requirements.txt
+venv\Scripts\activate
 ```
-3. Create two containers in your storage account. One called `input` and the other called `output`. 
 
-4. Start the Function App: Start the function app to run the application locally.
-
+Fire up your Functions host in verbose mode so you can see each step:
 ```bash
 func start --verbose
 ```
+Test it
 
-5. Upload PDFs to the `input` container. That will execute the blob storage trigger in your Durable Function.
+Upload a PDF into your input container (via Portal, Storage Explorer, or Az CLI).
 
-6. After several seconds, your appliation should have finished the orchestrations. Switch to the `output` container and notice that the PDFs have been summarized as new files. 
+Watch the console logs spin through analyze_pdf, summarize_text, write_summary.
 
->Note: The summaries may be truncated based on token limit from Azure Open AI. This is intentional as a way to reduce costs. 
+Inspect the new .txt in your output container—it should contain your GPT summary!
 
-## Inspect the code
-This app leverages Durable Functions to orchestrate the application workflow. By using Durable Functions, there's no need for additional infrastructure like queues and state stores to manage task coordination and durability, which significantly reduces the complexity for developers. 
+## `function_app.py` Breakdown
+### Imports & Setup
 
-Take a look at the code snippet below, the `process_document` defines the entire workflow, which consists of a series of steps (activities) that need to be scheduled in sequence. Coordination is key, as the output of one activity is passed as an input to the next. Additionally, Durable Functions handle durability and retries, which ensure that if a failure occurs, such as a transient error or an issue with a dependent service, the workflow can recover gracefully.
+- Standard libs: logging, os, json, datetime
 
-![Orchestration Code](./media/code.png)
+- Azure Functions + Durable: azure.functions, azure.durable_functions
 
-## Deploy the app to Azure
+- Blob storage client: BlobServiceClient
 
-Use the [Azure Developer CLI (`azd`)](https://aka.ms/azd) to easily deploy the app. 
+- Form Recognizer client: DocumentAnalysisClient
 
-1. In the root of the project, run the following command to provision and deploy the app:
+HTTP calls: requests
+```bash
+import logging
+import os
+import json
+from datetime import datetime
 
-    ```bash
-    azd up
-    ```
+import azure.functions as func
+import azure.durable_functions as df
+from azure.storage.blob import BlobServiceClient
+from azure.core.credentials import AzureKeyCredential
+from azure.ai.formrecognizer import DocumentAnalysisClient
+import requests
+```
+### Blob Trigger
 
-1. When prompted, provide:
-   - A name for your [Azure Developer CLI environment](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/faq#what-is-an-environment-name).
-   - The Azure subscription you'd like to use.
-   - The Azure location to use.
+- Watches the input/ container.
+- kicks off the Durable orchestrator, passing in the filename.
 
-Once the azd up command finishes, the app will have successfully provisioned and deployed. 
 
-# Using the app
-To use the app, simply upload a PDF to the Blob Storage `input` container. Once the PDF is transferred, it will be processed using document intelligence and Azure OpenAI. The resulting summary will be saved to a new file and uploaded to the `output` container.
+```bash
+app = df.DFApp(http_auth_level=func.AuthLevel.ANONYMOUS)
+blob_svc = BlobServiceClient.from_connection_string(os.environ["BLOB_STORAGE_ENDPOINT"])
+
+@app.blob_trigger(arg_name="myblob", path="input", connection="BLOB_STORAGE_ENDPOINT")
+@app.durable_client_input(client_name="client")
+async def blob_trigger(myblob: func.InputStream, client):
+    logging.info(f"Trigger blob {myblob.name} ({myblob.length} bytes)")
+    name = myblob.name.split("/")[-1]
+    await client.start_new("orchestrator", client_input=name)
+
+```
+### Orchestrator
+
+- analyze_pdf → extract raw text
+- summarize_text → call OpenAI API
+- write_summary → store .txt in output/
+
+```bash
+@app.orchestration_trigger(context_name="context")
+def orchestrator(context):
+    blob_name = context.get_input()
+    opts = df.RetryOptions(first_retry_interval_in_milliseconds=5000,
+                           max_number_of_attempts=3)
+
+    text    = yield context.call_activity_with_retry("analyze_pdf", opts, blob_name)
+    summary = yield context.call_activity_with_retry("summarize_text", opts, text)
+    outblob = yield context.call_activity_with_retry("write_summary", opts,
+                                                     {"blob": blob_name, "summary": summary})
+    return outblob
+
+```
+### PDF → Text (analyze_pdf)
+
+- Downloads the PDF bytes
+- Calls Form Recognizer (prebuilt-layout)
+- Joins all lines into one large text string
+
+
+```bash
+@app.activity_trigger(input_name="blobName")
+def analyze_pdf(blobName):
+    blob = blob_svc.get_container_client("input").get_blob_client(blobName)
+    pdf_bytes = blob.download_blob().readall()
+
+    recog = DocumentAnalysisClient(
+        os.environ["COGNITIVE_SERVICES_ENDPOINT"],
+        AzureKeyCredential(os.environ["COGNITIVE_SERVICES_KEY"])
+    )
+    poller = recog.begin_analyze_document("prebuilt-layout",
+                                          document=pdf_bytes, locale="en-US")
+    pages = poller.result().pages
+
+    txt = "\n".join(
+        line.content
+        for p in pages
+        for line in p.lines
+    )
+    return txt
+
+```
+### Text → Summary (summarize_text)
+
+- Builds REST call to Azure OpenAI
+- Posts the raw text as a single user message
+- Extracts the GPT-generated summary
+
+```bash
+@app.activity_trigger(input_name="text")
+def summarize_text(text: str):
+    endpoint   = os.environ["AZURE_OPENAI_ENDPOINT"].rstrip("/")
+    deployment = os.environ["AZURE_OPENAI_DEPLOYMENT_NAME"]
+    api_ver    = "2025-01-01-preview"
+
+    url = f"{endpoint}/openai/deployments/{deployment}/chat/completions?api-version={api_ver}"
+    headers = {
+        "api-key": os.environ["AZURE_OPENAI_KEY"],
+        "Content-Type": "application/json"
+    }
+    body = {
+        "messages": [{"role": "user", "content": text}],
+        "max_tokens": 200
+    }
+
+    resp = requests.post(url, headers=headers, json=body)
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"]
+
+```
+### Write Summary (write_summary)
+
+- Names the file <original>.txt-<timestamp>
+- Uploads the summary string to output/
+```bash
+@app.activity_trigger(input_name="input")
+def write_summary(input: dict):
+    blob_name = input["blob"]
+    summary   = input["summary"]
+    ts        = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    out_name  = f"{blob_name}-{ts}.txt"
+
+    blob_svc.get_container_client("output")\
+        .upload_blob(name=out_name, data=summary)
+    return out_name
+
+```
+## function_app.py
+
+```python
+import logging
+import os
+import json
+from datetime import datetime
+
+import azure.functions as func
+import azure.durable_functions as df
+from azure.storage.blob import BlobServiceClient
+from azure.core.credentials import AzureKeyCredential
+from azure.ai.formrecognizer import DocumentAnalysisClient
+import requests
+
+# Durable Functions app
+app = df.DFApp(http_auth_level=func.AuthLevel.ANONYMOUS)
+
+# Blob client
+blob_svc = BlobServiceClient.from_connection_string(os.environ["BLOB_STORAGE_ENDPOINT"])
+
+# 1️⃣ Blob trigger
+@app.blob_trigger(arg_name="myblob", path="input", connection="BLOB_STORAGE_ENDPOINT")
+@app.durable_client_input(client_name="client")
+async def blob_trigger(myblob: func.InputStream, client):
+    logging.info(f"Trigger blob {myblob.name} ({myblob.length} bytes)")
+    name = myblob.name.split("/")[-1]
+    await client.start_new("orchestrator", client_input=name)
+
+# 2️⃣ Orchestrator
+@app.orchestration_trigger(context_name="context")
+def orchestrator(context):
+    blob_name = context.get_input()
+    opts = df.RetryOptions(first_retry_interval_in_milliseconds=5000, max_number_of_attempts=3)
+
+    text    = yield context.call_activity_with_retry("analyze_pdf", opts, blob_name)
+    summary = yield context.call_activity_with_retry("summarize_text", opts, text)
+    outblob = yield context.call_activity_with_retry("write_summary", opts, {"blob": blob_name, "summary": summary})
+    return outblob
+
+# 3️⃣ PDF → text
+@app.activity_trigger(input_name="blobName")
+def analyze_pdf(blobName):
+    logging.info("analyze_pdf")
+    blob = blob_svc.get_container_client("input").get_blob_client(blobName)
+    pdf_bytes = blob.download_blob().readall()
+
+    recog = DocumentAnalysisClient(
+        os.environ["COGNITIVE_SERVICES_ENDPOINT"],
+        AzureKeyCredential(os.environ["COGNITIVE_SERVICES_KEY"])
+    )
+    poller = recog.begin_analyze_document("prebuilt-layout", document=pdf_bytes, locale="en-US")
+    pages = poller.result().pages
+
+    txt = "\n".join(
+        line.content
+        for p in pages
+        for line in p.lines
+    )
+    return txt
+
+# 4️⃣ Text → summary via REST
+@app.activity_trigger(input_name="text")
+def summarize_text(text: str):
+    logging.info("summarize_text via REST")
+    endpoint   = os.environ["AZURE_OPENAI_ENDPOINT"].rstrip("/")
+    deployment = os.environ["AZURE_OPENAI_DEPLOYMENT_NAME"]
+    api_ver    = "2025-01-01-preview"
+
+    url = f"{endpoint}/openai/deployments/{deployment}/chat/completions?api-version={api_ver}"
+    headers = {
+        "api-key": os.environ["AZURE_OPENAI_KEY"],
+        "Content-Type": "application/json"
+    }
+    body = {
+        "messages": [{"role": "user", "content": text}],
+        "max_tokens": 200
+    }
+
+    resp = requests.post(url, headers=headers, json=body)
+    resp.raise_for_status()
+    choice = resp.json()["choices"][0]["message"]["content"]
+    return choice
+
+# 5️⃣ Write summary back
+@app.activity_trigger(input_name="input")
+def write_summary(input: dict):
+    blob_name = input["blob"]
+    summary   = input["summary"]
+    ts        = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    out_name  = f"{blob_name}-{ts}.txt"
+
+    blob_svc.get_container_client("output")\
+        .upload_blob(name=out_name, data=summary)
+    return out_name
+
+```
