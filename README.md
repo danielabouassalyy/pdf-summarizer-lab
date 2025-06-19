@@ -147,7 +147,7 @@ func start --verbose
 
    Watch the console logs spin through analyze_pdf, summarize_text, write_summary.
 
-   Inspect the new .txt in your output container—it should contain your GPT summary!
+   Inspect the new .txt in your output container, it should contain your GPT summary!
 
 ## `function_app.py` Breakdown
 ### Imports & Setup
@@ -160,7 +160,7 @@ func start --verbose
 
 - Form Recognizer client: DocumentAnalysisClient
 
-HTTP calls: requests
+- HTTP calls: requests
 ```bash
 import logging
 import os
